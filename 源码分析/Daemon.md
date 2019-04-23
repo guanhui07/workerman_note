@@ -76,4 +76,53 @@ workerman中daemon 实现
             exit(0);
         }
     }
+    
+    /**
+     * Fork one worker process.
+     *
+     * @param \Workerman\Worker $worker
+     * @throws Exception
+     */
+    protected static function forkOneWorkerForLinux($worker)
+    {
+        // Get available worker id.
+        $id = static::getId($worker->workerId, 0);
+        if ($id === false) {
+            return;
+        }
+        $pid = pcntl_fork();
+        // For master process.
+        if ($pid > 0) {
+            static::$_pidMap[$worker->workerId][$pid] = $pid;
+            static::$_idMap[$worker->workerId][$id]   = $pid;
+        } // For child processes.
+        elseif (0 === $pid) {
+            srand();
+            mt_srand();
+            if ($worker->reusePort) {
+                $worker->listen();
+            }
+            if (static::$_status === static::STATUS_STARTING) {
+                static::resetStd();
+            }
+            static::$_pidMap  = array();
+            // Remove other listener.
+            foreach(static::$_workers as $key => $one_worker) {
+                if ($one_worker->workerId !== $worker->workerId) {
+                    $one_worker->unlisten();
+                    unset(static::$_workers[$key]);
+                }
+            }
+            Timer::delAll();
+            static::setProcessTitle('WorkerMan: worker process  ' . $worker->name . ' ' . $worker->getSocketName());
+            $worker->setUserAndGroup();
+            $worker->id = $id;
+            $worker->run();
+            $err = new Exception('event-loop exited');
+            static::log($err);
+            exit(250);
+        } else {
+            throw new Exception("forkOneWorker fail");
+        }
+    }
 ```
