@@ -43,3 +43,37 @@ function daemon()
 
 那在调用`posix_setsid`之后为什么还要再`fork`一次呢? 其实这必不是必须的, `nginx`在实现`daemon`时就没有`fork`两次.
 很多`daemon`的实现都没有`fork`两次. 只是有人推荐在`sysv system`上, 再`fork`一次, 可以避免守护进程打开控制终端, 因为再`fork`一次之后, 子进程就不是`session leader`了.
+
+
+
+workerman中daemon 实现
+```
+ /**
+     * Run as deamon mode.
+     *
+     * @throws Exception
+     */
+    protected static function daemonize()
+    {
+        if (!static::$daemonize || static::$_OS !== OS_TYPE_LINUX) {
+            return;
+        }
+        umask(0);
+        $pid = pcntl_fork();
+        if (-1 === $pid) {
+            throw new Exception('fork fail');
+        } elseif ($pid > 0) {
+            exit(0);
+        }
+        if (-1 === posix_setsid()) {
+            throw new Exception("setsid fail");
+        }
+        // Fork again avoid SVR4 system regain the control of terminal.
+        $pid = pcntl_fork();
+        if (-1 === $pid) {
+            throw new Exception("fork fail");
+        } elseif (0 !== $pid) {
+            exit(0);
+        }
+    }
+```
