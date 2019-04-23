@@ -47,7 +47,7 @@ function daemon()
 
 
 workerman中daemon 实现
-```
+```php
  /**
      * Run as deamon mode.
      *
